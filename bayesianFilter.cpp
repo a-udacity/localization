@@ -21,9 +21,8 @@ bayesianFilter::bayesianFilter() {
     //set standard deviation of control:
     control_std     = 1.0f;
 
-    //TODO: set up standard deviation of observations
-    // set as 1.0f, and include in header file
-    //observation_std =
+    //set standard deviation of observations:
+    observation_std = 1.0f;
 
     //define size of different state vectors:
     bel_x.resize(100,0);
@@ -114,6 +113,7 @@ void bayesianFilter::process_measurement(const MeasurementPackage &measurements,
         /**************************************************************************
          *  observation update:
         **************************************************************************/
+
         //define pseudo observation vector:
         std::vector<float> pseudo_ranges ;
 
@@ -121,47 +121,61 @@ void bayesianFilter::process_measurement(const MeasurementPackage &measurements,
         float distance_max = 100;
 
         //loop over number of landmarks and estimate pseudo ranges:
-        //for (unsigned int l=0; l< ...){
+        for (unsigned int l=0; l< map_1d.landmark_list.size(); ++l){
 
-        //calculate difference between landmark position
-        // and current believe state index
-        //float range_l =
+            //estimate pseudo range for each single landmark
+            //and the current state position pose_i:
+            float range_l = map_1d.landmark_list[l].x_f - pose_i;
 
-        //check, if distances are positive, and store positive range:
-        //if(...)
-        //pseudo_ranges.push_back(....) ;
-        //}
+            //check, if distances are positive:
+            if(range_l > 0.0f)
+                pseudo_ranges.push_back(range_l) ;
+        }
 
         //sort pseudo range vector:
-        //sort(pseudo_ranges.begin(), pseudo_ranges.end());
+        sort(pseudo_ranges.begin(), pseudo_ranges.end());
 
         //define observation posterior:
         float posterior_obs = 1.0f ;
 
-        //run over current observations vector defined above:
-        //for (unsigned int z=0; z< ....){
+        //run over current observation vector:
+        for (unsigned int z=0; z< observations.distance_f.size(); ++z){
 
-        //define min distance:
+            //define min distance:
+            float pseudo_range_min;
 
-        // TODO: set min distance either to the closet landmark
-        // or if no landmarks exist to the maximum set distance
+            //check, if distance vector exists:
+            if(pseudo_ranges.size() > 0){
 
+                //set min distance:
+                pseudo_range_min = pseudo_ranges[0];
+                //remove this entry from pseudo_ranges-vector:
+                pseudo_ranges.erase(pseudo_ranges.begin());
 
-        //estimate the posterior for observation model:
-        // MULTIPLY by normpdf of obseravations distance,
-        // min distance, and obseravtion_std
-        //posterior_obs*=
-        //}
+            }
+                //no or negative distances: set min distance to maximum distance:
+            else{
+                pseudo_range_min = distance_max ;
+            }
 
-        //TODO: MULTIPLY motion_model by observation_update
-        bel_x[i] = posterior_motion;
+            //estimate the posterior for observation model:
+            posterior_obs*= helpers.normpdf(observations.distance_f[z],
+                                            pseudo_range_min,
+                                            observation_std);
+        }
 
+        /**************************************************************************
+         *  finalize bayesian localization filter:
+         *************************************************************************/
+
+        //update = observation_update* motion_model
+        bel_x[i] = posterior_obs*posterior_motion ;
 
     };
 
     //normalize:
     bel_x = helpers.normalize_vector(bel_x);
 
-    ///set bel_x to bel_init:
+    //set bel_x to belief_init:
     bel_x_init = bel_x;
 };
